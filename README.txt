@@ -1,3 +1,22 @@
+Protocol Buffers v2.5.0 compile in Apple M1.
+1、生成configure文件
+bash autogen.sh
+2、编译前的准备工作
+# mac系统中用户没有权限直接在/usr/local目录安装，因此我把protoc安装到当前用户的local目录下
+# 把${macos_username}替换成你的用户名
+mkdir /Users/${macos_username}/local/
+mkdir build
+cd build
+3、生成makefile文件
+../configure CFLAGS='-fsigned-char' --prefix=/Users/${macos_username}/local/
+4、编译与安装
+make -j8 && make install
+5、将protoc安装到mvn仓库
+mvn install:install-file -DgroupId=com.google.protobuf -DartifactId=protoc -Dversion=2.5.0 -Dclassifier=osx-aarch_64 -Dpackaging=exe -Dfile=/Users/${macos_username}/local/bin/protoc
+
+参考：https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Hive/kunpenghive_02_0013.html
+
+
 Protocol Buffers - Google's data interchange format
 Copyright 2008 Google Inc.
 http://code.google.com/apis/protocolbuffers/

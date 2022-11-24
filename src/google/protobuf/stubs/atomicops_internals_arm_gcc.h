@@ -68,6 +68,30 @@ inline Atomic32 NoBarrier_CompareAndSwap(volatile Atomic32* ptr,
   } while (prev_value == old_value);
   return prev_value;
 }
+inline Atomic64 NoBarrier_CompareAndSwap(volatile Atomic64* ptr,
+                                         Atomic64 old_value,
+                                         Atomic64 new_value) {
+  Atomic64 prev;
+  int32_t temp;
+
+  __asm__ __volatile__ (  // NOLINT
+    "0:                                    \n\t"
+    "ldxr %[prev], %[ptr]                  \n\t"
+    "cmp %[prev], %[old_value]             \n\t"
+    "bne 1f                                \n\t"
+    "stxr %w[temp], %[new_value], %[ptr]   \n\t"
+    "cbnz %w[temp], 0b                     \n\t"
+    "1:                                    \n\t"
+    : [prev]"=&r" (prev),
+      [temp]"=&r" (temp),
+      [ptr]"+Q" (*ptr)
+    : [old_value]"IJr" (old_value),
+      [new_value]"r" (new_value)
+    : "cc", "memory"
+  );  // NOLINT
+
+  return prev;
+}
 
 inline Atomic32 NoBarrier_AtomicExchange(volatile Atomic32* ptr,
                                          Atomic32 new_value) {
@@ -105,6 +129,15 @@ inline Atomic32 Acquire_CompareAndSwap(volatile Atomic32* ptr,
   return NoBarrier_CompareAndSwap(ptr, old_value, new_value);
 }
 
+inline Atomic64 Acquire_CompareAndSwap(volatile Atomic64* ptr,
+                                       Atomic64 old_value,
+                                       Atomic64 new_value) {
+  Atomic64 prev = NoBarrier_CompareAndSwap(ptr, old_value, new_value);
+  MemoryBarrier();
+
+  return prev;
+}
+
 inline Atomic32 Release_CompareAndSwap(volatile Atomic32* ptr,
                                        Atomic32 old_value,
                                        Atomic32 new_value) {
@@ -115,8 +148,11 @@ inline void NoBarrier_Store(volatile Atomic32* ptr, Atomic32 value) {
   *ptr = value;
 }
 
-inline void MemoryBarrier() {
+/*inline void MemoryBarrier() {
   pLinuxKernelMemoryBarrier();
+}*/
+inline void MemoryBarrier() {
+  __asm__ __volatile__ ("dmb ish" ::: "memory");  // NOLINT
 }
 
 inline void Acquire_Store(volatile Atomic32* ptr, Atomic32 value) {
@@ -129,6 +165,15 @@ inline void Release_Store(volatile Atomic32* ptr, Atomic32 value) {
   *ptr = value;
 }
 
+inline void Release_Store(volatile Atomic64* ptr, Atomic64 value) {
+  __asm__ __volatile__ (  // NOLINT
+    "stlr %x[value], %[ptr]  \n\t"
+    : [ptr]"=Q" (*ptr)
+    : [value]"r" (value)
+    : "memory"
+  );  // NOLINT
+}
+
 inline Atomic32 NoBarrier_Load(volatile const Atomic32* ptr) {
   return *ptr;
 }
@@ -136,6 +181,19 @@ inline Atomic32 NoBarrier_Load(volatile const Atomic32* ptr) {
 inline Atomic32 Acquire_Load(volatile const Atomic32* ptr) {
   Atomic32 value = *ptr;
   MemoryBarrier();
+  return value;
+}
+
+inline Atomic64 Acquire_Load(volatile const Atomic64* ptr) {
+  Atomic64 value;
+
+  __asm__ __volatile__ (  // NOLINT
+    "ldar %x[value], %[ptr]  \n\t"
+    : [value]"=r" (value)
+    : [ptr]"Q" (*ptr)
+    : "memory"
+  );  // NOLINT
+
   return value;
 }
 
